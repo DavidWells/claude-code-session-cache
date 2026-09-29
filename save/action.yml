@@ -1,0 +1,33 @@
+# Saves the Claude Code session this run wrote so the next run on the same
+# Issue/PR can resume it. Call with `if: always()` after ../restore.
+name: 'Claude Code session cache: save'
+description: 'Save the Claude Code session this run wrote, keyed by the scope given to the restore action'
+author: 'David Wells'
+
+outputs:
+  session-id:
+    description: 'Session id that was saved, empty when nothing was saved'
+    value: ${{ steps.record.outputs.session-id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Record session
+      id: record
+      if: always()
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/../src/save.js"
+
+    - name: Save session cache
+      if: always() && steps.record.outputs.save == 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      continue-on-error: true
+      with:
+        path: |
+          ~/.claude/projects/*/*.jsonl
+          ~/.claude/session-meta
+        key: ${{ env.CLAUDE_SESSION_CACHE_KEY }}
+
+branding:
+  icon: save
+  color: orange

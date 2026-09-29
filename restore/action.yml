@@ -1,0 +1,52 @@
+# Restores the Claude Code session an earlier run left on this Issue/PR and
+# outputs "--resume <id>" for claude-code-action's claude_args. Pair with ../save.
+name: 'Claude Code session cache: restore'
+description: 'Restore the Claude Code session an earlier run saved for this Issue/PR and output --resume args'
+author: 'David Wells'
+
+inputs:
+  scope:
+    description: 'Work item the session belongs to, e.g. "pr-12" or "issue-34". Never a branch.'
+    required: true
+
+outputs:
+  resume-args:
+    description: '"--resume <id>" when a session for this scope was restored and is safe to resume, else empty'
+    value: ${{ steps.resolve.outputs.resume-args }}
+  session-id:
+    description: 'Session id Claude will resume, empty when starting fresh'
+    value: ${{ steps.resolve.outputs.session-id }}
+  resumed:
+    description: '"true" when a session will be resumed'
+    value: ${{ steps.resolve.outputs.resumed }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute session cache keys
+      id: keys
+      shell: bash
+      env:
+        INPUT_SCOPE: ${{ inputs.scope }}
+      run: node "$GITHUB_ACTION_PATH/../src/restore.js" keys
+
+    # Transcripts only (not the whole projects dir) so repo-wide auto-memory is
+    # never scoped to one Issue/PR
+    - name: Restore session cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      continue-on-error: true
+      with:
+        path: |
+          ~/.claude/projects/*/*.jsonl
+          ~/.claude/session-meta
+        key: ${{ steps.keys.outputs.key }}
+        restore-keys: ${{ steps.keys.outputs.restore-prefix }}
+
+    - name: Resolve session to resume
+      id: resolve
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/../src/restore.js" resolve
+
+branding:
+  icon: rotate-ccw
+  color: orange

@@ -1,0 +1,61 @@
+# Unit tests, plus a live round trip through the real cache: one job saves a
+# session, the next job restores it and must get --resume for it.
+name: Test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+
+  save-session:
+    runs-on: ubuntu-latest
+    outputs:
+      session-id: ${{ steps.save.outputs.session-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore (nothing cached yet)
+        id: restore
+        uses: ./restore
+        with:
+          scope: selftest-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Assert fresh start
+        run: test "${{ steps.restore.outputs.resumed }}" = "false"
+      - name: Fake a Claude transcript
+        run: |
+          dir="$HOME/.claude/projects/-home-runner-work-selftest"
+          mkdir -p "$dir"
+          echo '{"type":"user","message":{"content":"hi"}}' > "$dir/11111111-1111-4111-8111-111111111111.jsonl"
+      - name: Save
+        id: save
+        if: always()
+        uses: ./save
+      - name: Assert saved
+        run: test "${{ steps.save.outputs.session-id }}" = "11111111-1111-4111-8111-111111111111"
+
+  resume-session:
+    needs: save-session
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore
+        id: restore
+        uses: ./restore
+        with:
+          scope: selftest-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Assert resumed
+        run: |
+          test "${{ steps.restore.outputs.resumed }}" = "true"
+          test "${{ steps.restore.outputs.resume-args }}" = "--resume 11111111-1111-4111-8111-111111111111"

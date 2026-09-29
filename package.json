@@ -1,0 +1,18 @@
+{
+  "name": "claude-code-session-cache",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub Actions to carry a Claude Code session between CI runs on the same Issue/PR",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DavidWells/claude-code-session-cache"
+  },
+  "scripts": {
+    "test": "uvu test"
+  },
+  "author": "David Wells",
+  "license": "MIT",
+  "devDependencies": {
+    "uvu": "^0.5.6"
+  }
+}
