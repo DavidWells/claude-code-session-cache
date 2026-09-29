@@ -27,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     # Longer than the Claude step timeout so the save step still runs after it times out
     timeout-minutes: 60
+    # Needed for issues/issue_comment/pull_request_target triggers (see Caveats)
+    cache-mode: write
     steps:
       - uses: actions/checkout@v4
 
@@ -66,6 +68,7 @@ Pin to a commit SHA.
 
 ## Caveats
 
+- **Cache writes on untrusted triggers.** Since 2026-06-26 GitHub issues read-only cache tokens to `issues`, `issue_comment`, `pull_request_target` and fork `workflow_run` runs ([changelog](https://github.blog/changelog/2026-06-26-read-only-actions-cache-for-untrusted-triggers/)). `save` then warns `cache write denied: token has no writable scopes` and the next run starts fresh. Set `cache-mode: write` on the Claude job, and only if that job is gated to trusted actors (e.g. `author_association` OWNER/MEMBER/COLLABORATOR): write access on low-trust triggers reintroduces cache-poisoning risk, and GitHub annotates it with a warning.
 - **Save the code too.** The transcript is only the conversation. If Claude's file edits aren't pushed, a resumed session believes changes exist that the fresh checkout lacks. Commit and push unfinished work in an `if: always()` step when the Claude step doesn't succeed.
 - **Timeouts.** Set a step-level `timeout-minutes` on Claude shorter than the job's, with `continue-on-error: true`. If the job timeout hits first the job is killed and later steps may not run.
 - **Cache scope.** Actions caches are scoped by git ref. `issue_comment` / `issues` / `pull_request_target` runs use the default branch and share caches; `pull_request_review*` runs use the PR ref and can read default-branch caches but not the reverse.
