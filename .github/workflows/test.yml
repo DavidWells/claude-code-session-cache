@@ -13,11 +13,13 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm test
 
   save-session:
@@ -25,14 +27,18 @@ jobs:
     outputs:
       session-id: ${{ steps.save.outputs.session-id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Restore (nothing cached yet)
         id: restore
         uses: ./restore
         with:
           scope: selftest-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Assert fresh start
-        run: test "${{ steps.restore.outputs.resumed }}" = "false"
+        env:
+          RESUMED: ${{ steps.restore.outputs.resumed }}
+        run: test "$RESUMED" = "false"
       - name: Fake a Claude transcript
         run: |
           dir="$HOME/.claude/projects/-home-runner-work-selftest"
@@ -43,19 +49,26 @@ jobs:
         if: always()
         uses: ./save
       - name: Assert saved
-        run: test "${{ steps.save.outputs.session-id }}" = "11111111-1111-4111-8111-111111111111"
+        env:
+          SESSION_ID: ${{ steps.save.outputs.session-id }}
+        run: test "$SESSION_ID" = "11111111-1111-4111-8111-111111111111"
 
   resume-session:
     needs: save-session
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Restore
         id: restore
         uses: ./restore
         with:
           scope: selftest-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Assert resumed
+        env:
+          RESUMED: ${{ steps.restore.outputs.resumed }}
+          RESUME_ARGS: ${{ steps.restore.outputs.resume-args }}
         run: |
-          test "${{ steps.restore.outputs.resumed }}" = "true"
-          test "${{ steps.restore.outputs.resume-args }}" = "--resume 11111111-1111-4111-8111-111111111111"
+          test "$RESUMED" = "true"
+          test "$RESUME_ARGS" = "--resume 11111111-1111-4111-8111-111111111111"
